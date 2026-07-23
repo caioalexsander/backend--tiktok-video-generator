@@ -1,4 +1,4 @@
-import { ISpeechProvider, SpeechOptions, SpeechResult } from './ISpeechProvider.js';
+import type { ISpeechProvider, SpeechOptions, SpeechResult } from './ISpeechProvider.js';
 import { exec } from 'child_process';
 import util from 'util';
 import fs from 'fs/promises';
@@ -9,19 +9,32 @@ const execPromise = util.promisify(exec);
 export class PiperSpeechProvider implements ISpeechProvider {
   private modelPath = 'models/voice.pt-BR.onnx';
 
-  async generateSpeech(text: string, options: SpeechOptions = {}): Promise<SpeechResult> {
+      async generateSpeech(text: string, options: SpeechOptions = {}): Promise<SpeechResult> {
     const outputPath = path.join('temp', `narration_${Date.now()}.wav`);
 
     await fs.mkdir('temp', { recursive: true });
 
     const command = `./piper --model ${this.modelPath} --output_file ${outputPath}`;
 
-    await execPromise(command, { input: text });
+    return new Promise((resolve, reject) => {
+      const { exec } = require('child_process');
+      
+      const proc = exec(command, (error: any, stdout: string, stderr: string) => {
+        if (error) {
+          console.error('Piper error:', stderr);
+          reject(error);
+          return;
+        }
+        resolve({
+          audioUrl: outputPath,
+          duration: 60,
+          success: true
+        });
+      });
 
-    return {
-      audioUrl: outputPath,
-      duration: 60, // calcular com ffprobe depois
-      success: true
-    };
+      // Envia o texto para o stdin do Piper
+      proc.stdin?.write(text);
+      proc.stdin?.end();
+    });
   }
 }

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import fluentFfmpeg from 'fluent-ffmpeg';
-import { ISpeechProvider } from '../providers/speech/ISpeechProvider.js';
+import type { ISpeechProvider } from '../providers/speech/ISpeechProvider.js';
 import { PiperSpeechProvider } from '../providers/speech/PiperSpeechProvider.js';
 import fs from 'fs/promises';
 import path from 'path';
