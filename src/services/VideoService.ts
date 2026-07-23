@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import fluentFfmpeg from 'fluent-ffmpeg';
 import type { ISpeechProvider } from '../providers/speech/ISpeechProvider.js';
 import { PiperSpeechProvider } from '../providers/speech/PiperSpeechProvider.js';
+import { config } from '../config/index.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -76,12 +77,45 @@ export class VideoService {
   }
 
   private async getRandomImages(count: number): Promise<string[]> {
-    // Implementar busca no Supabase Storage
-    return []; // placeholder
-  }
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(config.supabase.url, config.supabase.key);
+
+  const { data: files } = await supabase.storage.from('imagens').list();
+
+  if (!files || files.length === 0) return [];
+
+  const shuffled = files.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count).map(f => 
+    supabase.storage.from('imagens').getPublicUrl(f.name).data.publicUrl
+  );
+}
 
   private async uploadToGoogleDrive(videoPath: string): Promise<string> {
-    // Implementar upload
-    return 'https://drive.google.com/...';
-  }
+  const { google } = await import('googleapis');
+  const auth = new google.auth.OAuth2(
+    config.googleDrive.clientId,
+    config.googleDrive.clientSecret
+  );
+  auth.setCredentials({ refresh_token: config.googleDrive.refreshToken });
+
+  const drive = google.drive({ version: 'v3', auth });
+
+  const fileMetadata = {
+    name: `video_${Date.now()}.mp4`,
+    parents: [config.googleDrive.folderId]
+  };
+
+  const media = {
+    mimeType: 'video/mp4',
+    body: require('fs').createReadStream(videoPath)
+  };
+
+  const response = await drive.files.create({
+    requestBody: fileMetadata,
+    media: media,
+    fields: 'id, webViewLink'
+  });
+
+  return response.data.webViewLink!;
+}
 }

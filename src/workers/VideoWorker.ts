@@ -1,23 +1,18 @@
-import { Worker, Job } from 'bullmq';
+import { Worker } from 'bullmq';
 import { VideoService } from '../services/VideoService.js';
-import { videoQueue } from '../queue/index.js';
+import { config } from '../config/index.js';
 
 const videoService = new VideoService();
 
-export const videoWorker = new Worker('video-generation', async (job: Job) => {
-  const { roteiroId } = job.data;
-  console.log(`🔄 Processando job ${job.id} para roteiro ${roteiroId}`);
+export const startWorker = () => {
+  const worker = new Worker('video-generation', async (job) => {
+    const { roteiroId } = job.data;
+    await videoService.generateVideo(roteiroId);
+  }, {
+    connection: { url: config.redis },
+    concurrency: 2
+  });
 
-  await videoService.generateVideo(roteiroId);
-}, {
-  connection: { url: process.env.REDIS_URL! },
-  concurrency: 3 // máximo simultâneo
-});
-
-videoWorker.on('completed', (job) => {
-  console.log(`✅ Job ${job.id} concluído`);
-});
-
-videoWorker.on('failed', (job, err) => {
-  console.error(`❌ Job ${job?.id} falhou:`, err);
-});
+  console.log('👷 Video Worker iniciado');
+  return worker;
+};
